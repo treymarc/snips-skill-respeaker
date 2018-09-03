@@ -1,14 +1,16 @@
 from array_color import ArrayColor
 from custom_color import CustomColor
 import json
+import time
 from math import ceil
 from one_color import OneColor
 import os
 import threading
 import Queue
-import RPi.GPIO as GPIO
+#import RPi.GPIO as GPIO
 import sys
 import subprocess
+import mraa
 
 DIR = os.path.dirname(os.path.realpath(__file__)) + '/'
 
@@ -116,17 +118,30 @@ class SnipsRespeaker:
     def __init__(self, config_file=DIR + "config.json", locale=None):
         num_led = 0
 
-        GPIO.setmode(GPIO.BCM)
+        #GPIO.setmode(GPIO.BCM)
         p = subprocess.Popen(['arecord', '-l'], stdout=subprocess.PIPE)
         out, err = p.communicate()
         if (out.find("seeed-4mic-voicecard") != -1):
             num_led = 12
-            GPIO.setup(5, GPIO.OUT, initial=GPIO.HIGH)
+            #GPIO.setup(5, GPIO.OUT, initial=GPIO.HIGH)
         if (out.find("seeed-2mic-voicecard") != -1):
             num_led = 3
+        if (out.find("seeed-8mic-voicecard") != -1):
+            num_led = 12
+
         if (num_led == 0):
             print("No Respeaker Hat installed")
             return
+
+
+        if (num_led == 12):
+            en = mraa.Gpio(12)
+            if os.geteuid() != 0 :
+                time.sleep(1)
+                             
+            en.dir(mraa.DIR_OUT)
+            en.write(0)
+
         with open(config_file) as f:
             data = json.load(f)
         if ("waiting" in data):
@@ -140,8 +155,8 @@ class SnipsRespeaker:
         SnipsRespeaker.queue.put("working")
         SnipsRespeaker.queue.put("waiting")
         t = threading.Thread(target=SnipsRespeaker.worker, args=())
-        GPIO.setup(17, GPIO.IN, pull_up_down=GPIO.PUD_UP)
-        GPIO.add_event_detect(17, GPIO.FALLING, callback=hotword_toggle, bouncetime=300)
+        #GPIO.setup(17, GPIO.IN, pull_up_down=GPIO.PUD_UP)
+        #GPIO.add_event_detect(17, GPIO.FALLING, callback=hotword_toggle, bouncetime=300)
         t.start()
 
     def hotword_detected(self):
